@@ -1,0 +1,4 @@
+kata
+====
+
+Coding kata
