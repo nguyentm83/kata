@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 )
 
 func assert(t bool, note string) {
@@ -104,10 +105,11 @@ func scan(d bigdigit) int {
 func OCR(d []bigdigit) string {
 	result := ""
 	for _, c := range d {
-		v := scan(c)
-
-		// assumption : v >= 0
-		result += fmt.Sprintf("%d", v)
+		if v := scan(c); v >= 0 {
+			result += fmt.Sprintf("%d", v)
+		} else {
+			result += "?"
+		}
 	}
 
 	return result
@@ -125,8 +127,25 @@ func stringToDigit(s []string) []bigdigit {
 	return digits
 }
 
-func testOcr() {
-	log.Printf("TEST OCR (USER STORY 1) STARTED ...")
+func isValid(s string) bool {
+	// calculate checksum
+	d9 := int(s[0]) - '0'
+	d8 := int(s[1]) - '0'
+	d7 := int(s[2]) - '0'
+	d6 := int(s[3]) - '0'
+	d5 := int(s[4]) - '0'
+	d4 := int(s[5]) - '0'
+	d3 := int(s[6]) - '0'
+	d2 := int(s[7]) - '0'
+	d1 := int(s[8]) - '0'
+	chksum := (d1 + 2*d2 + 3*d3 + 4*d4 + 5*d5 + 6*d6 + 7*d7 + 8*d8 + 9*d9) % 11
+	return chksum == 0
+}
+
+/* TESTING */
+
+func TestStory1() {
+	log.Printf("TEST USER STORY 1 STARTED ...")
 	acct0 := []string{
 		" _  _  _  _  _  _  _  _  _ ",
 		"| || || || || || || || || |",
@@ -204,9 +223,48 @@ func testOcr() {
 	assert("888888888" == OCR(stringToDigit(acct8)), "test 8")
 	assert("999999999" == OCR(stringToDigit(acct9)), "test 9")
 	assert("123456789" == OCR(stringToDigit(acct10)), "test 10")
+}
 
+func validate(s string) string {
+	if strings.Contains(s, "?") {
+		return s + " ILL"
+	}
+
+	if isValid(s) {
+		return s
+	}
+
+	return s + " ERR"
+}
+
+func TestStory3() {
+	log.Printf("TEST USER STORY 3 STARTED ...")
+
+	acct0 := []string{
+		" _  _  _  _  _  _  _  _    ",
+		"| || || || || || || ||_   |",
+		"|_||_||_||_||_||_||_| _|  |",
+	}
+
+	acct1 := []string{
+		"    _  _  _  _  _  _     _ ",
+		"|_||_|| || ||_   |  |  | _ ",
+		"  | _||_||_||_|  |  |  | _|",
+	}
+
+	acct2 := []string{
+		"    _  _     _  _  _  _  _ ",
+		"  | _| _||_| _ |_   ||_||_|",
+		"  ||_  _|  | _||_|  ||_| _ ",
+	}
+
+	assert("000000051" == validate(OCR(stringToDigit(acct0))), "test 11")
+	assert("49006771? ILL" == validate(OCR(stringToDigit(acct1))), "test 12")
+	assert("1234?678? ILL" == validate(OCR(stringToDigit(acct2))), "test 13")
 }
 
 func main() {
-	testOcr()
+	TestStory1()
+	TestStory3()
 }
+
