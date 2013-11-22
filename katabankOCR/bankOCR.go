@@ -1,3 +1,4 @@
+// http://codingdojo.org/cgi-bin/wiki.pl?back=KataBankOCR
 package main
 
 import (
@@ -261,10 +262,11 @@ func TestStory3() {
 	assert("000000051" == validate(OCR(stringToDigit(acct0))), "test 11")
 	assert("49006771? ILL" == validate(OCR(stringToDigit(acct1))), "test 12")
 	assert("1234?678? ILL" == validate(OCR(stringToDigit(acct2))), "test 13")
+	assert("664371495 ERR" == validate("664371495"), "test 14")
+	assert("86110??36 ILL" == validate("86110??36"), "test 15")
 }
 
 func main() {
 	TestStory1()
 	TestStory3()
 }
-
