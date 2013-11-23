@@ -1,4 +1,4 @@
-// http://codingdojo.org/cgi-bin/wiki.pl?back=KataBankOCR
+// http://codingdojo.org/cgi-bin/wiki.pl?KataBankOCR
 package main
 
 import (
@@ -13,7 +13,18 @@ func assert(t bool, note string) {
 	}
 }
 
+const (
+	VALID = 0
+	ILL   = 1
+	ERR   = 2
+)
+
 type bigdigit [3]string
+
+type element struct {
+	graphic       *bigdigit // graphic representation
+	possibilities []int     // possible character
+}
 
 /* GLOBAL VARIABLES */
 
@@ -81,8 +92,59 @@ var digitlist = []bigdigit{
 	zero, one, two, three, four, five, six, seven, eight, nine,
 }
 
-func init() {
+var alldigit []element
 
+func isReplaceable(a, b *bigdigit) bool {
+	count := 0
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			//			if a[i][j] == ' ' && (b[i][j] == '|' || b[i][j] == '_') {
+			// if a[i][j] != b[i][j] && (a[i][j] == ' ' || b[i][j] == ' ') {
+			if a[i][j] != b[i][j] {
+				count++
+			} else if a[i][j] != b[i][j] {
+				return false
+			}
+		}
+	}
+
+	if count == 1 {
+		return true
+	}
+
+	return false
+}
+
+func init() {
+	alldigit = make([]element, 10)
+	alldigit[0] = element{&zero, []int{}}
+	alldigit[1] = element{&one, []int{}}
+	alldigit[2] = element{&two, []int{}}
+	alldigit[3] = element{&three, []int{}}
+	alldigit[4] = element{&four, []int{}}
+	alldigit[5] = element{&five, []int{}}
+	alldigit[6] = element{&six, []int{}}
+	alldigit[7] = element{&seven, []int{}}
+	alldigit[8] = element{&eight, []int{}}
+	alldigit[9] = element{&nine, []int{}}
+
+	// initialize the possibilities
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			if i == j {
+				continue
+			}
+			if k := isReplaceable(alldigit[i].graphic, alldigit[j].graphic); k == true {
+				alldigit[i].possibilities = append(alldigit[i].possibilities, j)
+			}
+		}
+	}
+
+	/*
+		for i, v := range alldigit {
+			fmt.Printf("%d %v\n", i, v.possibilities)
+		}
+	*/
 }
 
 func equal(x, y bigdigit) bool {
@@ -226,16 +288,25 @@ func TestStory1() {
 	assert("123456789" == OCR(stringToDigit(acct10)), "test 10")
 }
 
-func validate(s string) string {
+func validate(s string) int {
 	if strings.Contains(s, "?") {
-		return s + " ILL"
+		return ILL
 	}
 
 	if isValid(s) {
-		return s
+		return VALID
 	}
 
-	return s + " ERR"
+	return ERR
+}
+
+func validatestr(s string) string {
+	if v := validate(s); v == ILL {
+		return s + " ILL"
+	} else if v == ERR {
+		return s + " ERR"
+	}
+	return s
 }
 
 func TestStory3() {
@@ -259,14 +330,151 @@ func TestStory3() {
 		"  ||_  _|  | _||_|  ||_| _ ",
 	}
 
-	assert("000000051" == validate(OCR(stringToDigit(acct0))), "test 11")
-	assert("49006771? ILL" == validate(OCR(stringToDigit(acct1))), "test 12")
-	assert("1234?678? ILL" == validate(OCR(stringToDigit(acct2))), "test 13")
-	assert("664371495 ERR" == validate("664371495"), "test 14")
-	assert("86110??36 ILL" == validate("86110??36"), "test 15")
+	assert("000000051" == validatestr(OCR(stringToDigit(acct0))), "test 11")
+	assert("49006771? ILL" == validatestr(OCR(stringToDigit(acct1))), "test 12")
+	assert("1234?678? ILL" == validatestr(OCR(stringToDigit(acct2))), "test 13")
+	assert("664371495 ERR" == validatestr("664371495"), "test 14")
+	assert("86110??36 ILL" == validatestr("86110??36"), "test 15")
+}
+
+func fixAccount(s []string) string {
+	acctNo := OCR(stringToDigit(s))
+	result := []string{acctNo}
+
+	if status := validate(acctNo); status == ERR {
+		for i := 0; i < len(acctNo); i++ {
+			keep := int(acctNo[i]) - '0'
+			safe := acctNo
+			for j := 0; j < len(alldigit[keep].possibilities); j++ {
+				t := []byte(acctNo)
+				t[i] = byte(alldigit[keep].possibilities[j]) + 48
+				acctNo = string(t)
+
+				if validate(acctNo) == VALID {
+					result = append(result, acctNo)
+				}
+			}
+			acctNo = safe
+		}
+	} else if status == ILL {
+		//fmt.Println(acctNo)
+		v := strings.Index(acctNo, "?")
+		// invariant: when s == ILL, v >= 0
+
+		d := stringToDigit(s)[v]
+		//fmt.Println(d)
+		for i := 0; i < 10; i++ {
+			if isReplaceable(&d, alldigit[i].graphic) {
+				t := []byte(acctNo)
+				//	fmt.Println(t)
+				t[v] = byte(i) + 48
+				acctNo = string(t)
+				//	fmt.Println(acctNo)
+
+				if validate(acctNo) == VALID {
+					result = append(result, acctNo)
+					break
+				}
+			}
+		}
+
+	} else {
+		return acctNo
+	}
+
+	return strings.Join(result[1:], ",")
+}
+
+func TestStory4() {
+	log.Printf("TEST USER STORY 4 STARTED ...")
+
+	tc0 := []string{
+		"                           ",
+		"  |  |  |  |  |  |  |  |  |",
+		"  |  |  |  |  |  |  |  |  |",
+	}
+	tc1 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		"  |  |  |  |  |  |  |  |  |",
+		"  |  |  |  |  |  |  |  |  |",
+	}
+	tc2 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		" _|| || || || || || || || |",
+		"|_ |_||_||_||_||_||_||_||_|",
+	}
+	tc3 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		" _| _| _| _| _| _| _| _| _|",
+		" _| _| _| _| _| _| _| _| _|",
+	}
+	tc4 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		"|_||_||_||_||_||_||_||_||_|",
+		"|_||_||_||_||_||_||_||_||_|",
+	}
+	tc5 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		"|_ |_ |_ |_ |_ |_ |_ |_ |_ ",
+		" _| _| _| _| _| _| _| _| _|",
+	}
+	//=> 555555555 AMB ['555655555', '559555555']
+	tc6 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		"|_ |_ |_ |_ |_ |_ |_ |_ |_ ",
+		"|_||_||_||_||_||_||_||_||_|",
+	}
+	//=> 666666666 AMB ['666566666', '686666666']
+	tc7 := []string{
+		" _  _  _  _  _  _  _  _  _ ",
+		"|_||_||_||_||_||_||_||_||_|",
+		" _| _| _| _| _| _| _| _| _|",
+	}
+	//=> 999999999 AMB ['899999999', '993999999', '999959999']
+	tc8 := []string{
+		"    _  _  _  _  _  _     _ ",
+		"|_||_|| || ||_   |  |  ||_ ",
+		"  | _||_||_||_|  |  |  | _|",
+	}
+	//=> 490067715 AMB ['490067115', '490067719', '490867715']
+
+	tc9 := []string{
+		"    _  _     _  _  _  _  _ ",
+		" _| _| _||_||_ |_   ||_||_|",
+		"  ||_  _|  | _||_|  ||_| _|",
+	}
+	//=> 123456789
+
+	tc10 := []string{
+		" _     _  _  _  _  _  _    ",
+		"| || || || || || || ||_   |",
+		"|_||_||_||_||_||_||_| _|  |",
+	}
+	//=> 000000051
+	tc11 := []string{
+		"    _  _  _  _  _  _     _ ",
+		"|_||_|| ||_||_   |  |  | _ ",
+		"  | _||_||_||_|  |  |  | _|",
+	}
+	//=> 490867715
+	//fmt.Println(fixAccount(tc0))
+	assert("711111111" == fixAccount(tc0), "test 16")
+	assert("777777177" == fixAccount(tc1), "test 17")
+	assert("200800000" == fixAccount(tc2), "test 18")
+	assert("333393333" == fixAccount(tc3), "test 19")
+	assert("888886888,888888988,888888880" == fixAccount(tc4), "test 20")
+	assert("559555555,555655555" == fixAccount(tc5), "test 21")
+	assert("686666666,666566666" == fixAccount(tc6), "test 22")
+	assert("899999999,993999999,999959999" == fixAccount(tc7), "test 23")
+	assert("490867715,490067115,490067719" == fixAccount(tc8), "test 24")
+	assert("123456789" == fixAccount(tc9), "test 25")
+	assert("000000051" == fixAccount(tc10), "test 26")
+	assert("490867715" == fixAccount(tc11), "test 27")
+
 }
 
 func main() {
 	TestStory1()
 	TestStory3()
+	TestStory4()
 }
